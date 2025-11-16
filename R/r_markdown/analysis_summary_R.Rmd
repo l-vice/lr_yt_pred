@@ -39,13 +39,14 @@ set.seed(1)
 LoadLibraries <- function() {
   require(tidyverse)
   require(readxl)
+  require(kableExtra)
 }
 
 LoadLibraries()
 
 ```
 
-*RStudio: Checkpoint 1*
+**RStudio: Checkpoint 1**
 
 # Data Preprocessing
 
@@ -59,8 +60,7 @@ df <- read_excel("Data/rossman_variables_raw.xlsx")
 
 ```{r, echo=FALSE}
 
-cat("Column names:\n")
-(colnames(df))
+print(colnames(df))
 
 ```
 
@@ -208,7 +208,138 @@ Finally, we save the data frame and proceed to modelling in Orange. These variab
 
 ```
 
-*RStudio: Checkpoint 2*
+**Orange3: Checkpoint 1**
+
+# We import the preprocessed data frame in from R and perform variable selection in Orange3.
+
+```{r, echo=FALSE, fig.cap = "Orange3 Variable Ranking", out.width="90%"}
+
+knitr::include_graphics("ML/screenshots/sc_1_orange3.png")
+  
+```
+
+Let's break down what happens in each of our widgets.
+  1. Formula: In here we compute like_to_view_ratio and comment_view_ratio
+  2. Select Columns: We separate numerical features and categorical features 
+  3. Rank: We rank features using RRelieF for categorical and Univar. reg. for numeric.
+
+## Rank Widget Outputs
+
+We recreate the rank widget table output
+
+<style>
+.table-wrapper {
+  flex: 1;
+  margin: 0 10px;
+  height: 420px;
+  overflow-y: auto;
+  border: none;
+}
+</style>
+
+<div style="display:flex; justify-content: space-between; align-items: stretch;">
+  <div class="table-wrapper">
+
+```{r, echo=FALSE}
+
+categorical.rank <- data.frame(
+  Feature = c("month", "age_bin", "category_id", 
+              "weekday", "duration_bucket", "weekend"),
+  Rank = 1:6,
+  Score = c(0.482, 0.229, 0.147, 0.117, 0.094, 0.001)
+)
+
+categorical.rank %>%
+  kbl(caption = "Categorical Features Ranked by RRelieF") %>%
+  kable_styling(full_width = F, bootstrap_options = c("striped", "hover")) %>%
+  column_spec(3, color = "red", )
+
+```
+
+</div>
+
+<div class="table-wrapper">
+
+```{r, echo=FALSE}
+
+numeric.rank <- data.frame(
+  Feature = c("age_days", "comment_view_ratio", "duration_seconds", 
+              "comment_count", "like_count", "hour", "view_count"),
+  Rank = 1:7,
+  Score = c(2279.794, 1799.709, 319.482, 79.074, 50.098, 24.277, 2.436)
+)
+
+numeric.rank %>%
+  kbl(caption = "Numeric Features Ranked by Univariate Regression") %>%
+  kable_styling(full_width = F, bootstrap_options = c("striped", "hover")) %>%
+  column_spec(3, color = "red")
+
+```
+
+</div>
+</div>
+
+From the categorical variables, weekend was excluded due to its extremely low importance score and its conceptual overlap with weekday, which already captures temporal variation. Among the numerical variables, hour was removed given its low score and limited predictive contribution. In contrast, like_count, view_count, and comment_count were retained despite their relatively modest rankings, as they may offer incremental predictive value once combined with stronger features or transformed appropriately.
+
+## Correlation Analysis and Model Comparison
+
+```{r, echo=FALSE, fig.cap = "Orange3 Variable Selection", out.width="90%"}
+
+knitr::include_graphics("ML/screenshots/sc_2_orange3.png")
+
+```
+<style>
+.table-wrapper {
+  flex: 1;
+  margin: 0 10px;
+}
+</style>
+<div style="display:flex; justify-content: space-between;">
+
+<div class="table-wrapper">
+``` {r, echo=FALSE}
+
+correlation.table <- data.frame(
+  Pair = c("view_count : like_count", "comment_count : like_count",
+           "age_days : like_count", "like_view_ratio : like_count",
+           "duration_seconds : like_count", "comment_view_ratio : like_count"),
+  Correlation = c(0.941, 0.982, -0.161, 0.122, -0.046, 0.036)
+)
+
+correlation.table %>%
+  kbl(caption = "Pairwise Correlations Among Key Variables") %>%
+  kable_styling(full_width = F, bootstrap_options = c("striped", "hover")) %>%
+  column_spec(2, color = "red")
+
+```
+
+</div>
+
+<div class="table_wrapper">
+
+```{r, echo=FALSE}
+
+model.table <- data.frame(
+  Model = c("mod_lm_weekday", "mod_lm_no_weekday"),
+  RMSE = c(0.017, 0.017),
+  MAE = c(0.013, 0.013),
+  MAPE = c(30.231, 29.994),
+  R2 = c(0.594, 0.596)
+)
+
+model.table %>%
+  kbl(caption = "Model Comparison: With vs. Without Weekday") %>%
+  kable_styling(full_width = F, bootstrap_options = c("striped", "hover")) %>%
+  column_spec(5, color = "red")
+
+```
+
+</div>
+</div>
+
+The correlation results reveal strong dependencies between certain predictors, most notably *like_count* and *view_count* (r = 0.94) and *comment_count* with *like_count* (r = 0.89). Such high correlations suggest potential redundancy among engagement metrics. To test the added contribution of temporal effects, we compared models with and without *weekday* (Table Y). Both models achieved nearly identical performance (\(R^2 \approx 0.59\), RMSE = 0.017), indicating that *weekday* does not provide additional predictive power. Therefore, we exclude *weekday* for parsimony while retaining engagement-related variables.
+
+**RStudio: Checkpoint 2**
 
 # Importing the Orange-Selected Feature Set
 
@@ -239,8 +370,7 @@ Before applying any transformations, we fit a baseline linear model to establish
 
 ```{r}
 
-initial.mod <- lm(formula = like_view_ratio ~ comment_view_ratio + month + age_days + category_id +
-                    age_bin + duration_bucket + duration_seconds + comment_count + view_count, data = selected_features)
+initial.mod <- lm(formula = like_view_ratio ~ comment_view_ratio + month + age_days + category_id + age_bin + duration_bucket + duration_seconds + comment_count + view_count, data = selected_features)
 
 ```
 
@@ -334,7 +464,7 @@ log_transformations <- numerical_features %>%
     log1p_view_count = log1p(view_count),
     log1p_comment_count = log1p(comment_count)
   ) %>%
-  select(
+  dplyr::select(
     -like_view_ratio,-comment_view_ratio,
     -duration_seconds, -view_count,
     -comment_count, -age_days
@@ -377,8 +507,33 @@ print.data.frame(kurtosis_test_log)
 
 Log transforms brought view_count, like_view_ratio, and comment_view_ratio under the target kurtosis (< 4), so we keep them. However, since comment_view_ratio didn’t respond well to log, we apply a Box–Cox transform instead. We do the same for duration_seconds.
 
-**Note: We do not re-estimate λ in R; we reuse the λ values obtained in Orange.** 
+## Box–Cox Likelihood
 
+Suppose you have a regression model:  
+
+\[
+y_i = x_i^\top \beta + \varepsilon_i, \quad \varepsilon_i \sim N(0, \sigma^2), \quad i = 1, \ldots, n
+\]
+
+with strictly positive response values \(y_i > 0\).  
+
+After applying the Box–Cox transformation:  
+
+\[
+y_i^{(\lambda)} =
+\begin{cases}
+\dfrac{y_i^\lambda - 1}{\lambda}, & \text{if } \lambda \neq 0, \\
+\ln(y_i), & \text{if } \lambda = 0,
+\end{cases}
+\]
+
+the log-likelihood function for \(\lambda\) (ignoring constants) is:  
+
+\[
+\ell(\lambda) = -\frac{n}{2} \ln \left( \frac{\text{RSS}(\lambda)}{n} \right) + (\lambda - 1) \sum_{i=1}^n \ln y_i
+\]
+
+**Note: We do not re-estimate λ in R; we reuse the λ values obtained in Orange.** 
 
 ```{r}
 
@@ -450,8 +605,6 @@ kurtosis_test_boxcox <- dplyr::reframe(bxcx_transformations,
 print.data.frame(kurtosis_test_boxcox)
 
 ```
-
-
 
 ## Refit to Assess Improvement
 
@@ -585,7 +738,60 @@ The categorical merges reduce noise from sparsely populated levels, yielding a m
 
 **Note: These are adjusted R² values used for internal guidance; the report will use metrics computed in Orange.**
 
-*RStudio: Checkpoint 3*
+**Orange3: Checkpoint 2**
+
+## We now move to Orange3 to apply the transformations.
+```{r, echo=FALSE, fig.cap = "Orange3 Variable Transformation", out.width="90%"}
+
+knitr::include_graphics("ML/screenshots/sc_3_orange3.png")
+
+```
+```{r, echo=FALSE}
+
+model.compare <- data.frame(
+  Model = c("Log1p Transformations", "Log1p + Box-Cox Transformations"),
+  RMSE = c(0.015, 0.015),
+  MAE  = c(0.011, 0.011),
+  MAPE = c(26.832, 26.381),
+  R2   = c(0.630, 0.635)
+)
+
+model.compare %>%
+  kbl(caption = "Comparison of Model Performance after Log1p and Box-Cox Transformations") %>%
+  kable_styling(full_width = F, bootstrap_options = c("striped", "hover")) %>%
+  column_spec(5, color = "red")
+
+```
+
+## Final Modeling
+
+The data was split using the 80/20 transformation.
+The following models were fit: XGBoost, Linear Regression, AdaBoost and Random Forest
+
+```{r, echo=FALSE, fig.cap = "Orange3 Final Model Fit", out.width="90%"}
+
+knitr::include_graphics("ML/screenshots/sc_4_orange3.png")
+
+```
+
+```{r, echo=FALSE}
+
+final.models <- data.frame(
+  Model = c("XGBoost", "Linear Regression", "Random Forest", "AdaBoost"),
+  RMSE  = c(0.014, 0.015, 0.014, 0.015),
+  MAE   = c(0.011, 0.011, 0.010, 0.010),
+  MAPE  = c(25.065, 26.622, 23.510, 23.608),
+  R2    = c(0.657, 0.636, 0.700, 0.649)
+)
+
+final.models %>%
+  kbl(caption = "Performance of Final Models on Selected Variables") %>%
+  kable_styling(full_width = F, bootstrap_options = c("striped", "hover")) %>%
+  column_spec(5, color = "red")
+
+```
+
+**RStudio: Checkpoint 3**
 
 # Plots
 
@@ -734,6 +940,7 @@ ggplot(timeseries_data_mods_smoothed, aes(x = published_at)) +
     legend.position = "none",
     plot.margin = margin(t = 18, r = 8, b = 8, l = 8)
   )
+
 ```
 
 ```{r session-info, include=FALSE}
