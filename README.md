@@ -9,7 +9,7 @@ The analysis combines **statistical modeling in R** with **machine learning impl
 Full Report
 ------------
 The complete HTML analysis report can be viewed online here:  
-[**HTML MIRROR**](https://l-vice.github.io/lr_yt_pred/R/r_markdown/analysis_summary_R.html)
+[**HTML REPORT**](https://l-vice.github.io/lr_yt_pred/R/r_markdown/analysis_summary_R.html)
 
 Methodology
 ------------
@@ -82,5 +82,5 @@ James, G., Witten, D., Hastie, T., & Tibshirani, R. (2013). An introduction to s
 
 Author
 ------
-Luka Bojovic  
+Luka
 Email: lbojovic2@gmail.com
