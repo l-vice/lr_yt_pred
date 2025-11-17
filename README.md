@@ -9,7 +9,7 @@ The analysis combines **statistical modeling in R** with **machine learning impl
 Full Report
 ------------
 The complete HTML analysis report can be viewed online here:  
-[**analysis_summary_R.html (GitHub Pages)**](https://l-vice.github.io/lr_yt_pred/R/r_markdown/analysis_summary_R.html)
+[**HTML MIRROR**](https://l-vice.github.io/lr_yt_pred/R/r_markdown/analysis_summary_R.html)
 
 Methodology
 ------------
